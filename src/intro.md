@@ -1,2 +1,10 @@
 # Introduction
+**BorrowSanitizer** is a dynamic analysis tool for detecting Rust-specific aliasing bugs in multi-language applications.
 
+The Rust compiler provides powerful, *static* safety guarantees by restricting aliasing and mutability. However, developers can bypass these restrictions by using a subset of [`unsafe`](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html) features, which are necessary to interoperate with other languages. If these features are used incorrectly, then they can break the rules of Rust's aliasing model, which the compiler relies on to be able to optimize programs. Incorrect optimizations can introduce security vulnerabilities.
+
+Rust developers can find aliasing bugs using [Miri](https://github.com/rust-lang/miri), an interpreter. Miri is **the only tool** that can find violations of Rust's latest [Tree Borrows](https://www.ralfj.de/blog/2023/06/02/tree-borrows.html) aliasing model. However, Miri cannot find these bugs in foreign functions. it can execute native functions from shared libraries, but Miri has no way of finding errors that occur in foreign code. Miri is also significantly slower than native execution, which makes it impractical to use techniques like fuzzing or property-based testing to find these Rust-specific bugs.
+
+BorrowSanitizer is an LLVM sanitizer for finding aliasing violations. It will be fast enough for use with fuzzing tools, and it will support Rust, C, and C++ in interoperation. Our project is still in early stages, so BorrowSanitizer is not functional yet. However, our primary goal is to create a production-ready tool. In addition to aliasing violations, BorrowSanitizer will also be able to find use-after-free errors, accesses out-of-bounds, and memory leaks. It will support unininstrumented function calls and true multithreading.
+
+Join [our Zulip](https://bsan.zulipchat.com/) if you are interested in contributing or if you have any additional questions about our project. You can build and test our sanitizer by following the setup instructions in the next section. All of our code is open-source and publicly available [on GitHub](https://github.com/borrowsanitizer).
