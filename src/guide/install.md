@@ -17,13 +17,16 @@ For the moment, the only way to try BorrowSanitizer is to build [our fork of Rus
 ```
 git clone https://github.com/BorrowSanitizer/rust.git && cd rust
 ```
+
+Our [development configuration file](https://github.com/BorrowSanitizer/rust/blob/bsan/src/bootstrap/defaults/config.bsan.dev.toml) provides the minimal settings required for building BorrowSanitizer. Copy it to the root directory to use it as a starting point.
+```
+cp ./src/bootstrap/defaults/config.bsan.dev.toml config.toml
+```
 Then, build our development toolchain.
 ```
-./x.py build --config ./src/bootstrap/config.bsan.dev.toml
+./x.py build
 ```
-Our [development configuration file](https://github.com/BorrowSanitizer/rust/blob/bsan/src/bootstrap/defaults/config.bsan.dev.toml) provides the minimal settings required for building BorrowSanitizer.
-
-Then, link our toolchain and set it as the default.
+Link our toolchain and set it as the default.
 ```
 rustup toolchain link bsan build/host/stage1 
 rustup default bsan
