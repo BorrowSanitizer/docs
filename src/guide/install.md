@@ -1,7 +1,21 @@
-# Setup
+# Installing BorrowSanitizer
+
+
+## Requirements
+Currently, we only support the following compilation targets:
+
+|         **target**        | **description** |
+|-------------------------|---------------|
+| `aarch64-apple-darwin` |   ARM64 macOS (M-series)   |
+|  `x86_64-unknown-linux-gnu` |    X86 Linux    |
+
+You also need to have [installed Rust](https://www.rust-lang.org/tools/install).
+
+## Installation
+
 For the moment, the only way to try BorrowSanitizer is to build [our fork of Rust](https://github.com/BorrowSanitizer/rust) from source.
 ```
-git clone https://github.com/rust-lang/rust.git && cd rust
+git clone https://github.com/BorrowSanitizer/rust.git && cd rust
 ```
 Then, build our development toolchain.
 ```
@@ -18,11 +32,3 @@ You can enable BorrowSanitizer by passing the flag `-Zsanitizer=borrow` to Cargo
 ```
 RUSTFLAGS='-Zsanitizer=borrow' cargo ...
 ```
-
-## Requirements 
-Currently, we only support the following compilation targets:
-
-|         **target**        | **description** |
-|-------------------------|---------------|
-| `aarch64-apple-darwin` |   ARM64 macOS (M-series)   |
-|  `x86_64-unknown-linux-gnu` |    X86 Linux    |∂

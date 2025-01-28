@@ -2,7 +2,8 @@
 [Introduction](intro.md)
 
 # User Guide
-- [Setup](guide/setup.md)
+- [Install](guide/install.md)
+- [Develop](guide/dev.md)
 
 --------------
 [About](about.md)
