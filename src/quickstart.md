@@ -1,4 +1,4 @@
-# Installation
+# Quickstart
 
 Currently, the only way to try BorrowSanitizer is to build [our fork of Rust](https://github.com/BorrowSanitizer/rust) from source. To do this, you will need to have [installed Rust](https://www.rust-lang.org/tools/install).
 

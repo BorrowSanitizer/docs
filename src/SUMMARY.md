@@ -1,6 +1,6 @@
 # Summary
 [Introduction](intro.md)
-[Quickstart](install.md)
+[Quickstart](quickstart.md)
 
 --------------
 [About](about.md)
