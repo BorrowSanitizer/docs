@@ -1,9 +1,6 @@
 # Summary
 [Introduction](intro.md)
-
-# User Guide
-- [Install](guide/install.md)
-- [Develop](guide/dev.md)
+[Quickstart](install.md)
 
 --------------
 [About](about.md)
