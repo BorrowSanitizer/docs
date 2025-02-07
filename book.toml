@@ -8,5 +8,9 @@ title = "BorrowSanitizer"
 [output.html]
 git-repository-url = "https://github.com/BorrowSanitizer"
 
+[preprocessor.external-links]
+after = [ "image-size" ]
+
 [preprocessor.image-size]
 command = "mdbook-image-size"
+

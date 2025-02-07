@@ -1,7 +1,7 @@
 # About
 
-Join [our Zulip](https://bsan.zulipchat.com/) and reach out to us if you have any questions or if you are interested in contributing. 
-All components of BorrowSanitizer are open-source and publicly available [on GitHub](https://github.com/borrowsanitizer).
+Reach out to us [on Zulip](https://bsan.zulipchat.com/) if you have questions or are interested in contributing. 
+BorrowSanitizer is open-source and publicly available [on GitHub](https://github.com/borrowsanitizer).
 
 ## Team
 BorrowSanitizer is currently being developed by:
