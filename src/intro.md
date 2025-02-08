@@ -10,6 +10,6 @@ Rust developers can find aliasing bugs using [Miri](https://github.com/rust-lang
 
 BorrowSanitizer is an LLVM sanitizer for finding aliasing violations. Our goal is for it to be fast enough for use with fuzzing tools and to have support for Rust, C, and C++ in interoperation. We intend for it to be a production-ready tool.
 
-> 🚧 Our project is still in early stages, so BorrowSanitizer is not functional yet. 🚧
+> 🚧 Our project is still in early stages. BorrowSanitizer is not functional yet. 🚧
 
 Join [our Zulip](https://bsan.zulipchat.com/) if you are interested in contributing or if you have any additional questions about our project. You can build and test our sanitizer by following the setup instructions in the next section. All of our code is open-source and publicly available [on GitHub](https://github.com/borrowsanitizer).
