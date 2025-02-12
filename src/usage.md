@@ -1,14 +1,34 @@
 # Usage
-You can enable BorrowSanitizer by passing the flag `-Zsanitizer=borrow` to the Rust compiler, like so: 
+
+
+## From Rust
+The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically. Due 
 ```
-RUSTFLAGS="-Zsanitizer=borrow" cargo build -Zbuild-std --target <host>
+cargo bsan
 ```
-Replace `<host>` with your current target. You can find out what this is by checking in the `build` folder or executing the following command:
+Our plugin also links Rust programs against an instrumented sysroot, so that you can avoid rebuilding the standard library when switching between projects.
+
+You can manually enable BorrowSanitizer by passing the flag `-Zsanitizer=borrow` to the Rust compiler, like so: 
 ```
-rustc -Vv | awk '/host:/ {print $2}'
+RUSTFLAGS="-Zsanitizer=borrow" cargo build
 ```
-The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically. The following command is equivalent to the one above.
+Replace `<host>` with your current target. You can find out what this is executing the command `rustc -vV`. If a crate has doctests, then you will need to enable BorrowSanitizer within *both* `RUSTFLAGS` and `RUSTDOCFLAGS` for it to compile correctly.
+
+
+The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically. Due 
 ```
-cargo bsan build
+cargo bsan [build/test/clean]
 ```
-Our plugin also creates and links against an instrumented sysroot so that you can avoid rebuilding the standard library when switching between projects.
+Our plugin also links Rust programs against an instrumented sysroot, so that you can avoid rebuilding the standard library when switching between projects.
+
+## Clang
+Our default development configuration builds a version of Clang that supports BorrowSanitizer. You can access from build scripts by setting the environment variables `CC` and `CXX` to the absolute path to the `clang` binary in our build directory, like so:
+```
+export CC=".../host/llvm/bin/clang"
+```
+Alternatively, you can set our entire build of LLVM to be first in your path, so that all invocations of `clang` will default to our custom one.
+```
+export PATH=".../host/llvm/bin/:$PATH"
+```
+You can enable BorrowSanitizer in `clang` by passing the flag `-fsanitize=borrow`. 
+
