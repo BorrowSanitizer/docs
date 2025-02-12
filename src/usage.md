@@ -1,23 +1,13 @@
 # Usage
-
-
-## From Rust
-The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically. Due 
-```
-cargo bsan
-```
-Our plugin also links Rust programs against an instrumented sysroot, so that you can avoid rebuilding the standard library when switching between projects.
-
 You can manually enable BorrowSanitizer by passing the flag `-Zsanitizer=borrow` to the Rust compiler, like so: 
 ```
 RUSTFLAGS="-Zsanitizer=borrow" cargo build
 ```
 Replace `<host>` with your current target. You can find out what this is executing the command `rustc -vV`. If a crate has doctests, then you will need to enable BorrowSanitizer within *both* `RUSTFLAGS` and `RUSTDOCFLAGS` for it to compile correctly.
 
-
-The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically. Due 
+The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically.
 ```
-cargo bsan [build/test/clean]
+cargo bsan
 ```
 Our plugin also links Rust programs against an instrumented sysroot, so that you can avoid rebuilding the standard library when switching between projects.
 
@@ -30,5 +20,4 @@ Alternatively, you can set our entire build of LLVM to be first in your path, so
 ```
 export PATH=".../host/llvm/bin/:$PATH"
 ```
-You can enable BorrowSanitizer in `clang` by passing the flag `-fsanitize=borrow`. 
-
+You can enable BorrowSanitizer in `clang` by passing the flag `-fsanitize=borrow`.

@@ -56,3 +56,16 @@ rustup toolchain link bsan build/host/stage1
 rustup default bsan
 ```
 > Visit the [Rust Compiler Development Guide](https://rustc-dev-guide.rust-lang.org/building/how-to-build-and-run.html#how-to-build-and-run-the-compiler) for additional tips and tricks.
+
+## Usage
+You can manually enable BorrowSanitizer by passing the flag `-Zsanitizer=borrow` to the Rust compiler, like so: 
+```
+RUSTFLAGS="-Zsanitizer=borrow" cargo build
+```
+Replace `<host>` with your current target. You can find out what this is executing the command `rustc -vV`. If a crate has doctests, then you will need to enable BorrowSanitizer within *both* `RUSTFLAGS` and `RUSTDOCFLAGS` for it to compile correctly.
+
+The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically.
+```
+cargo bsan <build/test/run>
+```
+Our plugin also links Rust programs against an instrumented sysroot, so that you can avoid rebuilding the standard library when switching between projects.
