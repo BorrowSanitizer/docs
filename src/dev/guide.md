@@ -43,6 +43,4 @@ We have unit tests for our runtime library and UI tests for the entire toolchain
 ./x.py test src/tools/bsan/bsan-driver
 ```
 
-Our [CI pipeline](https://github.com/BorrowSanitizer/rust/blob/bsan/.github/workflows/build.yml) checks for formatting before building and testing our toolchain on each of our supported architectures. Before opening a a pull request, make sure to run `./x.py fmt` and execute each of our test cases. All pull requests should be made using the branch [`BorrowSanitizer/bsan`](https://github.com/BorrowSanitizer/rust/tree/bsan) as the base for comparison. 
-
-Make sure to select the correct branch when using GitHub, since the interface defaults to submitting a pull request against the main branch of the Rust toolchain! All pull requests must pass our CI pipline. External pull requests must be reviewed by a member of the team.
+Our [CI pipeline](https://github.com/BorrowSanitizer/rust/blob/bsan/.github/workflows/build.yml) checks for formatting and executes our tests on each of our supported architectures. Run `./x.py fmt` before opening a pull request. All pull requests should be made using the branch [`BorrowSanitizer/bsan`](https://github.com/BorrowSanitizer/rust/tree/bsan) as the base for comparison. Make sure to select the correct branch when using GitHub, since the interface defaults to submitting a pull request against the main branch of the Rust toolchain! All pull requests must pass our CI pipline. External pull requests must be reviewed by a member of the team.
