@@ -4,7 +4,7 @@ Reach out to us [on Zulip](https://bsan.zulipchat.com/) if you have questions or
 
 ## Team
 BorrowSanitizer is currently being developed by:
-* [Ian McCormack](https://icmccorm.me)
+* [Ian McCormack](https://icmccorm.com)
 * [Oliver Braunsdorf](https://obraunsdorf.dev/)
 * [Aaron Tan](https://www.linkedin.com/in/aaron-tan-3a94a1214)
 
