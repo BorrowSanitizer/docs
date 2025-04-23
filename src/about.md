@@ -8,5 +8,7 @@ BorrowSanitizer is currently being developed by:
 * [Oliver Braunsdorf](https://obraunsdorf.dev/)
 * [Aaron Tan](https://www.linkedin.com/in/aaron-tan-3a94a1214)
 
-## License
+## License & Credits
 BorrowSanitizer is dual-licensed under [Apache](https://github.com/BorrowSanitizer/rust/blob/bsan/LICENSE-APACHE) and [MIT](https://github.com/BorrowSanitizer/rust/blob/bsan/LICENSE-MIT).
+
+[<img src="images/zulip-icon-circle.svg" alt="Zulip" style="height: 1em;"/> Zulip](https://zulip.com/) sponsors free hosting for BorrowSanitizer. Zulip is an open-source modern team chat app designed to keep both live and asynchronous conversations organized.
