@@ -5,7 +5,6 @@ We only guarantee support for the following compilation targets:
 |         **target**        | **description** |
 |-------------------------|---------------|
 | `aarch64-apple-darwin` |   ARM64 macOS (M-series)   |
-|  `aarch64-unknown-linux-gnu` |    ARM64 Linux    |
 |  `x86_64-unknown-linux-gnu` |    X86 Linux    |
 
 You can try to use our tool with other platforms, but there is no guarantee that it will work as expected, since we are only developing and testing it for these targets at the moment.
