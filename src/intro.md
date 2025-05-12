@@ -1,6 +1,6 @@
 # Introduction
 
-> 🎉 We'll be presenting at the 2025 Rust Verification Workshop ([RV2025](https://sites.google.com/view/rustverify2025)). Here's our [abstract](pdfs/rw2025.pdf).
+> 🎉 We'll be presenting at the 2025 Rust Verification Workshop ([RV2025](https://sites.google.com/view/rustverify2025)). Here's our [presentation](pdfs/RW2025_presentation.pdf) and [abstract](pdfs/rw2025.pdf).
 
 **BorrowSanitizer** is a dynamic analysis tool for detecting Rust-specific aliasing bugs in multi-language applications.
 
