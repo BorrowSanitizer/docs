@@ -1,7 +1,3 @@
-# Sample workflow for building and deploying a mdBook site to GitHub Pages
-#
-# To get started with mdBook see: https://rust-lang.github.io/mdBook/index.html
-#
 name: docs
 
 on:
@@ -27,7 +23,7 @@ concurrency:
 jobs:
   # Build job
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     env:
       MDBOOK_VERSION: 0.4.36
     steps:
