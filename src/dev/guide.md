@@ -1,69 +1,18 @@
 # Development Guide
-BorrowSanitizer uses several extensions to the Rust and LLVM toolchains.
 
-| Toolchain | Component                  |`./x.py build` | Link |
-|-----------|----------------------------|:-----:|:----:|
-| Rust      | Cargo Plugin               | `cargo-bsan` | [{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/rust/tree/bsan/src/tools/bsan/bsan-driver/cargo-bsan)     |
-| Rust      | Rustc Plugin               | `bsan-driver` |[{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/rust/tree/bsan/src/tools/bsan/bsan-driver/)     |
-| LLVM      | Instrumentation Pass       | - |[{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/llvm-project/blob/bsan/llvm/lib/Transforms/Instrumentation/BorrowSanitizer.cpp)     |
-| LLVM      | Sanitizer Interface        |`bsan-rt` |[{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/llvm-project/tree/bsan/compiler-rt/lib/bsan)      |
-| Rust    | Sanitizer Runtime Library  |`bsan-rt` |[{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/rust/tree/bsan/src/tools/bsan/bsan-rt)      |
+BorrowSanitizer has multiple components. Each can be built and tested individual via `xb`. 
 
-## System Overview
-Our Cargo plugin builds an instrumented [sysroot](https://rustc-dev-guide.rust-lang.org/building/bootstrapping/what-bootstrapping-does.html?highlight=sysroot#what-is-a-sysroot) by redirecting compiler invocations through our Rustc plugin, which adds the flags for enabling BorrowSanitizer. This saves time when switching between projects. Otherwise, users would need to rebuild Rust's standard library by passing `-Zbuild-std` for every project that they want to use with BorrowSanitizer. Any static optimizations that require Rust-specific type information will be implemented within the Rustc plugin. 
+| Component                  | Subdirectory  | Link  |
+|----------------------------|---------------|:-----:|
+| Cargo Plugin               | `cargo-bsan`  | [{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/bsan/tree/main/cargo-bsan)  |
+| Rustc Plugin               | `bsan-driver` | [{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/bsan/tree/main/bsan-driver) |
+| Backend Instrumentation Pass       | `bsan-pass`   | [{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/bsan/tree/main/bsan-pass)   |
+| Runtime                    | `bsan-rt`     | [{{#include ../images/link.svg}}](https://github.com/BorrowSanitizer/bsan/tree/main/bsan-rt)     |
 
-We modified the Rust compiler to accept `borrow` as one of the options for `-Z sanitizer=...`. If this option is enabled, then the compiler will emit "retag" instructions, which create new permissions for references. This has a  effect similar to the flag `-Zmir-emit-retag`, which Miri uses to emit retags. However, Miri only emits retags for a subset of operations, the rest are executed implicitly as side-effects of the interpreter. We emit retags everywhere that they are necessary for Tree Borrows. Our retags are lowered to LLVM as calls to a new `@llvm.retag` intrinsic function. Our LLVM insturmentation pass replaces this intrinsic with a call to our runtime library. Its arguments will capture all of the Rust-specific type information that we need to instrument LLVM IR for detecting aliasing violations. All other run-time checks are inserted in the backend by the LLVM pass. 
 
-Our runtime library is implemented as two components. The first component is implemented in C++ using the LLVM Sanitizer API. This component redirects our runtime checks to a *Rust* runtime library, where we implement the semantics of Rust's aliasing model and all necessary operations for initializing and accessing values in shadow memory. This design allows us to reuse Miri's implementation of Tree Borrows. It will also make it easier to port our approach to other Rust backends, since developers will only need to reimplement our instrumentation pass. Eventually, we will distribute these libraries as LLVM IR, which our Cargo plugin will statically link against the source program using [cross-language LTO](https://doc.rust-lang.org/rustc/linker-plugin-lto.html). This will allows us to gain performance through inlining. They are dynamically linked for now, though.
+### Why do we need a custom compiler? 
+We also rely on forks of both the Rust toolchain and LLVM. Initially, we developed everything in-tree within our Rust fork, but we have since found that it's easier to iterate by externalizing everything as a plugin. This includes our LLVM pass, which is "injected" into the compilation process using Rust's unstable [`-Zllvm-plugin`](https://github.com/rust-lang/rust/issues/127577) flag. Overall, our approach is similar what worked for the [Enzyme project](https://github.com/rust-lang/enzyme), which also relies on an out-of-tree LLVM plugin.
 
-## Configuration
-Builds of the Rust compiler are configured through a [`config.toml`](https://github.com/rust-lang/rust/blob/master/config.example.toml) file in the root directory of the repository. 
-This file is auto-generated by running `./x.py setup`. BorrowSanitizer, you need to set the following configuration options: 
-```
-[build]
-extended = true
-tools = ["bsan-rt", "cargo-bsan"]
+Although most of BorrowSanitizer has been externalized, we do still need our custom compiler. We *really* wanted to avoid this, but it ended up being necessary to support inserting "retag" instructions into LLVM IR. Under each of Rust's aliasing models, a retag updates the permission associated with a pointer, indicating that a reference has been created, reborrowed, or passed into a function. Retags are already implemented as [MIR intrinsics](https://doc.rust-lang.org/std/intrinsics/mir/fn.Retag.html), but we needed a way to lower them further down into LLVM IR, so that our instrumentation pass can transform them into calls into our runtime library.
 
-[llvm]
-download-ci-llvm = false
-
-[rust]
-llvm-tools = true
-```
-This ensures that LLVM is built from source so that you have access to our instrumentation pass. We also recommend setting `clang=true` under this section. This builds our modified version of Clang, which can be configured to enable BorrowSanitizer for C/C++ programs.
-
-We provide a [sample configuration file](https://github.com/BorrowSanitizer/rust/blob/bsan/src/bootstrap/defaults/config.bsan.dev.toml) for you to modify.
-If you are creating a distribution build, then you should reuse Rust's [default configuration](https://github.com/BorrowSanitizer/rust/blob/bsan/src/bootstrap/defaults/config.dist.toml).
-
-## Faster LLVM Builds
-
-Changes to LLVM require rebuilding parts of the frontend. This can make it difficult to rapidly test changes to the backend instrumentations pass. For faster rebuilds, we recommend following these steps:
-
-First, remove the build directory if it exists.
-```
-rm -rf ./build
-```
-Then, add the following setting to your configuration file:
-```
-[llvm]
-link-shared=true
-```
-This ensures that LLVM will be built as a dynamically linked library. Now, build LLVM:
-```
-./x.py build llvm
-```
-Afterward, add the absolute path to `./build/host/llvm/lib` so that LLVM is visible to the dynamic linker.
-```
-export LD_LIBRARY_PATH="$(cd build/host/llvm/lib && pwd):$LD_LIBRARY_PATH"
-```
-If you are compiling on macOS, then you will *also* need to add this path to the variable "LD_RUNPATH_SEARCH_PATH". 
-
-## Testing & CI
-We have unit tests for our runtime library and UI tests for the entire toolchain. Our unit tests are within `bsan-rt`, and our UI tests are within `bsan-driver`. You can execute each test suite by passing the relative path to these components as an argument to `./x.py test`, like so: 
-
-```
-./x.py test src/tools/bsan/bsan-rt
-./x.py test src/tools/bsan/bsan-driver --stage 2
-```
-
-Our [CI pipeline](https://github.com/BorrowSanitizer/rust/blob/bsan/.github/workflows/build.yml) checks for formatting and executes our tests on each of our supported architectures. Run `./x.py fmt` before opening a pull request. All pull requests should be made using the branch [`BorrowSanitizer/bsan`](https://github.com/BorrowSanitizer/rust/tree/bsan) as the base for comparison. Make sure to select the correct branch when using GitHub, since the interface defaults to submitting a pull request against the main branch of the Rust toolchain! All pull requests must pass our CI pipline. External pull requests must be reviewed by a member of the team.
+We were unable to add a custom retag function via our frontend compiler plugin (`bsan-driver`), since Rust's plugin interface gives mostly immutable access to the HIR; it's not possible to add in a new type of this kind after typechecking has been completed. So, we needed a way to declare our function ahead-of-time. The best mechanism for doing this is an intrinsic. Rust's intrinsics are provided by either the frontend or one of more of its codegen backends. Since we need retags to be available at the LLVM level, we needed to modify the LLVM codegen backend. It's possible to add a custom codegen backend without modifying the compiler by using an out-of-tree plugin (see [`rustc_interface`](https://doc.rust-lang.org/stable/nightly-rustc/rustc_interface/interface/struct.Config.html#structfield.make_codegen_backend)). Better yet, this approach has been successful for projects that have been widely adopted, like [Kani](https://github.com/model-checking/kani). However, in our case, we only needed to add support for a single intrinsic while preserving the existing LLVM backend *and* keeping it up-to-date with nightly. For long-term maintenance, we decided that forking Rust would be easier than factoring out just the LLVM backend.

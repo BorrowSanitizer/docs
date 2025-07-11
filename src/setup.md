@@ -1,70 +1,45 @@
 # Setup
-Currently, the only way to try BorrowSanitizer is to build [our fork of Rust](https://github.com/BorrowSanitizer/rust) from source. 
-We only guarantee support for the following compilation targets:
+The easiest way to try BorrowSanitizer is inside a Docker container. Our image supports the following platforms:
 
-|         **target**        | **description** |
-|-------------------------|---------------|
-| `aarch64-apple-darwin` |   ARM64 macOS (M-series)   |
-|  `x86_64-unknown-linux-gnu` |    X86 Linux    |
+|   **Platform**    |         **Target**            | **Description**            |
+|-------------------|-------------------------------|----------------------------|
+|   `linux/amd64`   | `aarch64-apple-darwin`        |   ARM64 macOS (M-series)   |
+|   `linux/arm64`   |  `x86_64-unknown-linux-gnu`   |    X86 Linux               |
 
-You can try to use our tool with other platforms, but there is no guarantee that it will work as expected, since we are only developing and testing it for these targets at the moment.
+First, pull our [latest image](https://github.com/BorrowSanitizer/bsan/pkgs/container/bsan) from GitHub's container registry.
+```
+docker pull ghcr.io/borrowsanitizer/bsan:latest
+```
+Then, launch a container and attach a shell.
+```
+docker run -it bsan:latest
+```
+Once inside the container, you can use our Cargo plugin to build and test crates using BorrowSanitizer. 
+```
+cargo bsan test
+```
+Our plugin supports most of the same subcommands as Miri. When it's used for the first time, it will perform a one-time setup step of building an instrumented sysroot. You can trigger this step manually using the `setup` subcommand.
 
 ## Building from Source
+Every single command needed to build, test, and install BorrrowSanitizer can be accessed through `xb`, our build script. For first-time setup, run:
+```
+xb setup
+```
+If you only want to install BorrowSanitizer, then run:
+```
+xb install
+```
+This will install a [custom Rust toolchain](https://github.com/BorrowSanitizer/rust) under the name `bsan`. You can speed this up by building our [dev container](https://containers.dev/), which already has the `bsan` toolchain installed. We recommend using the container to avoid any environment-specific issues. 
 
-You will need the following dependencies:
-* [Rustup](https://www.rust-lang.org/tools/install)
-* [Ninja](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages)
+You can build and test components of the project using the `build` and `test` subcommands. For example, running `xb build` will build everything, but you can also pass the name of a subdirectory to build just that component, like so:
+```
+xb build bsan-rt
+```
+Nearly every subcommand can be used this way. 
 
-Start by cloning our git repository. If you plan on contributing to BorrowSanitizer, we recommend either a full clone (without any additional flags) or passing `--filter='blob:none'`, which will speed up the initial download by fetching [blob objects](https://git-scm.com/book/en/v2/Git-Internals-Git-Objects) on-demand. Alternatively, you can pass `--depth 1` for a shallow clone, but you'll need to switch to a full clone if you want to contribute. 
+After making a change, you should run all of our CI steps locally using:
 ```
-git clone https://github.com/BorrowSanitizer/rust.git
-cd rust
-```
-
-## Production Builds
-If you want to install our toolchain, or if you do not plan on contributing, then use the default distribution settings.
-```
-./x.py setup dist
-```
-Next, create a directory for the installation and set the variable `DESTDIR` to its absolute path.
-```
-mkdir [path] && export DESTDIR=[path]
-```
-Then, build and install the toolchain. This will copy the distribution binaries into `$DESTDIR`.
-```
-./x.py build && ./x.py install
-```
-When the build is finished, link the toolchain and set it as the default. 
-```
-rustup toolchain link bsan $DESTDIR 
-rustup default bsan
+xb ui
 ```
 
-## Development Builds
-If you plan on contributing to BorrowSanitizer, you should copy our development [config file](https://github.com/BorrowSanitizer/rust/blob/bsan/src/bootstrap/defaults/config.bsan.dev.toml) into the root directory.
-```
-cp ./src/bootstrap/defaults/config.bsan.dev.toml config.toml
-```
-Then, build our toolchain.
-```
-./x.py build
-```
-When the build is complete, link the toolchain and set it as the default. 
-```
-rustup toolchain link bsan build/host/stage1 
-rustup default bsan
-```
-> Visit the [Rust Compiler Development Guide](https://rustc-dev-guide.rust-lang.org/building/how-to-build-and-run.html#how-to-build-and-run-the-compiler) for additional tips and tricks.
-
-## Usage
-You can manually enable BorrowSanitizer by passing the flag `-Zsanitizer=borrow` to the Rust compiler, like so: 
-```
-RUSTFLAGS="-Zsanitizer=borrow" cargo build
-```
-Replace `<host>` with your current target. You can find out what this is executing the command `rustc -vV`. If a crate has doctests, then you will need to enable BorrowSanitizer within *both* `RUSTFLAGS` and `RUSTDOCFLAGS` for it to compile correctly.
-
-The distribution build of our toolchain includes a Cargo plugin that will handle this step automatically.
-```
-cargo bsan <build/test/run>
-```
-Our plugin also links Rust programs against an instrumented sysroot, so that you can avoid rebuilding the standard library when switching between projects.
+This will place our binaries into Cargo's [home directory](https://doc.rust-lang.org/cargo/guide/cargo-home.html) (`$HOME/.cargo`). You will need to have `bsan` set as the active toolchain (e.g. `rustup default bsan`) for our tool to work. 
