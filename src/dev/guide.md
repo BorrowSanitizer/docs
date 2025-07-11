@@ -1,6 +1,6 @@
 # Development Guide
 
-BorrowSanitizer has multiple components. Each can be built and tested individual via `xb`. 
+BorrowSanitizer has multiple components. Each can be built, linted, and tested individually via `xb`. 
 
 | Component                  | Subdirectory  | Link  |
 |----------------------------|---------------|:-----:|
