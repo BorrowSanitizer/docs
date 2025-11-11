@@ -31,7 +31,7 @@ fn example(x: Option<Box<i32>>) {
     if let Some(mut x) = x {
         // Get a pointer to the inside of the `Box`.
         let ptr_x: *mut i32 = &raw mut *x;
-        // Turn it into a mutable borrow...
+        // Turn it into a mutable reference...
         let rx = &mut unsafe { *ptr_x };
         // ...but still keep using the pointer.
         unsafe { *ptr_x = 42; }
@@ -108,7 +108,7 @@ We would need an additional configuration flag to enable explicit retags in thes
 ## Codegen
 Once all retags are explicit, we need a way to lower them into a representation that can be consumed by codegen backends. The easiest way to do this with the least impact on existing APIs within the compiler is to emit retags as function calls. The underlying functions will not actually exist; the only purpose of these calls is to carry type and aliasing information, and we expect that they will be transformed or intercepted by third-party tools.
 
-A [`Place`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/struct.Place.html) is a series of zero or more projections—field offsets, casts, dereferences—from a local variable. If a place has projections, then the pointer that we are retagging is not available yet; we need to load it from memory. Otherwise, we can access the pointer directly as an operand without having to do any extra work. Miri handles each of these cases using [`retag_place_contents`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_place_contents) and [`retag_ptr_value`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_ptr_value), respectively. This means that we need to emit retags in two different forms, depending on whether the pointer being retagged has been loaded from memory, or if it's stored within a place. Each form will use a different function (shown in LLVM IR):
+Our first step at this point is to determine where pointers are located within the target place of a retag. A [`Place`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/struct.Place.html) is a series of zero or more projections—field offsets, casts, dereferences—from a local variable. If a place has projections, then the pointer that we are retagging is not available yet; we need to load it from memory. Otherwise, we can access the pointer directly as an operand without having to do any extra work. Miri handles each of these cases using [`retag_place_contents`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_place_contents) and [`retag_ptr_value`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_ptr_value), respectively. This means that we need to emit retags in two different forms, depending on whether the pointer being retagged has been loaded from memory, or if it's stored within a place. Each form will use a different function (shown in LLVM IR):
 ```llvm
 ptr @__retag_operand(ptr)
 void @__retag_place(ptr)
@@ -127,16 +127,18 @@ When this is compiled to LLVM IR, we will see:
 ```llvm
 %rx = call ptr @__retag_operand(ptr %ptr_x)
 ```
-Both `%rx` and `%ptr_x` will have the same address, but `%rx` is a different value; its provenance is different from that of `%ptr_x`. We do not specify the form that provenance metadata will take at this level. This is intentional, as there are multiple potential implementations; provenance could be stored [in shadow memory](https://valgrind.org/docs/shadow-memory2007.pdf), on the stack, or in the additional space afforded by [a wider pointer representation](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/). Regardless, we assume that the third-party tools which consume these retags will use one of these mechanisms to associate each pointer with its provenance metadata.
+Both `%rx` and `%ptr_x` will have the same address, but `%rx` is a different value; its provenance is different from that of `%ptr_x`.
 
-When a place is retagged, the first parameter to `__retag_place` is the address of the location containing the pointer that needs to be retagged. Unlike operands, there is no return value here; provenance is updated in-place. Our example also uses `__retag_place`, but it needs special handling. Recall that MIR retags are coarse-grained; they specify that an entire place needs to be retagged, but only a subset of the fields or variants of that place will contain references. If a place contains multiple fields, then we recursively offset into each field that needs a retag. However, variants are a bit more difficult. Consider the function-entry retag in our example:
+We do not specify the form that provenance metadata will take at this level. This is intentional, as there are multiple potential implementations; provenance could be stored in some form of [shadow memory](https://valgrind.org/docs/shadow-memory2007.pdf), on the stack, or in the additional space afforded by [a wider pointer representation](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/). We assume that third-party tools will use one of these mechanisms to associate each pointer with its provenance metadata.
+
+When a place is retagged, the first parameter to `__retag_place` is the address of the location containing the pointer that needs to be retagged. Unlike operands, there is no return value here; provenance is updated in-place. This does not actually happen as an effect of emitting the retag intrinsic. Instead, subsequent tool implementations need to implement this behavior, updating the provenance metadata accordingly. Our running example uses `__retag_place`, but it needs special handling. Recall that MIR retags are coarse-grained; they specify that an entire place needs to be retagged, but only a subset of the fields or variants of that place will contain references. If a place contains multiple fields, then we recursively offset into each field that needs a retag. However, variants are a bit more difficult. Consider the function-entry retag in our example:
 ```rust
 fn example(x: Option<Box<i32>>) -> () {
     ...
     bb0: {
         Retag([fn entry] x);
 ```
-We need to emit a function-entry retag for `x`, but this is only necessary if the `Option` contains a value. Miri can lookup the value stored in `x`, see which variant it has, and then perform the retag if necessary. We need to encode this branching logic into the compiled program. For example, the LLVM IR for the function `example` would need to look something like this:
+We need to emit a function-entry retag for `x`, but this is only necessary if the `Option` contains a value. Miri can lookup the value stored in `x`, see which variant it has, and then perform the retag if necessary. We need to encode this branching into the compiled program. For example, the LLVM IR for the function `example` would need to look something like this:
 ```llvm
 define void @example(ptr align 4 %0) {
 start:
@@ -153,7 +155,7 @@ is_some:                                    ; preds = %start
 next:
   ...
 ```
-In this snippet, the function `example` receives a pointer (`%0`) to the place containing the value of `x`. The type `Option<Box<T>>` has a ["nullable pointer representation"](https://doc.rust-lang.org/std/option/#options-and-pointers-nullable-pointers), so instead of an explicit discriminant, we know that the `Option` contains a value if the pointer `%0` is non-null. We store the integer value of this pointer in the register `%discr`, so if `%discr` is non-zero, then we know to branch to the block `%is_some`, where we retag the innermost pointer of the `Box`. Otherwise, we continue on into the remainder of the function.
+In this snippet, the function `example` receives a pointer (`%0`) to the place containing the value of `x`. The type `Option<Box<T>>` has a ["nullable pointer representation"](https://doc.rust-lang.org/std/option/#options-and-pointers-nullable-pointers), so instead of an explicit discriminant, we know that the `Option` contains a value if the pointer `%0` is non-null. We store the integer value of this pointer in the register `%discr`, so if `%discr` is non-zero, then we know to branch to the block `%is_some`, where we retag the innermost pointer of the `Box`.
 
 # Reference-level explanation
 Here, we describe each of the changes to the compiler that we will need to fully implement this feature.
