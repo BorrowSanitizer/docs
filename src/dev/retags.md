@@ -1,3 +1,6 @@
+We are drafting this RFC as part of our [Rust Project Goal](https://github.com/rust-lang/rust-project-goals/issues/392). This is incomplete, and it will continue to evolve as we gather feedback from the community.
+
+---
 # Summary
 [summary]: #summary
 We propose adding an unstable option that will lower MIR [`Retag`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/enum.StatementKind.html#variant.Retag) statements into function calls. This will support out-of-tree tools that use native instrumentation to find undefined behavior.
