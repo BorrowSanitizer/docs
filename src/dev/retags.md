@@ -4,7 +4,7 @@ We propose adding an unstable option that will lower MIR [`Retag`](https://doc.r
 
 # Motivation
 [motivation]: #motivation
-Miri is the only tool that can find violations of Rust's latest aliasing models. However, it cannot find these types of undefined behavior when they are triggered by operations that span foreign function boundaries. This tooling gap has caused developers to miss bugs in high-profile crates. An earlier version of the crate [`flate2-rs`](https://github.com/rust-lang/flate2-rs/pull/394) (which is maintained by the Rust project) had an aliasing violation that was caused by passing a mutable borrow to the following foreign function:
+Miri is the only tool that can find violations of Rust's latest aliasing models in production applications. However, it cannot find these types of undefined behavior when they are triggered by operations that span foreign function boundaries. This tooling gap has caused developers to miss bugs in high-profile crates. An earlier version of the crate [`flate2-rs`](https://github.com/rust-lang/flate2-rs/pull/394) (which is maintained by the Rust project) had an aliasing violation that was caused by passing a mutable borrow to the following foreign function:
 ```rust
 let ret = mz_deflateInit2(&mut *state, ...)
 ```
@@ -13,19 +13,19 @@ The Rust compiler is allowed to assume that ownership of `*state` will be return
 // The pointer `s` was derived from `&mut *state`.
 strm->state = (struct internal_state FAR *)s;
 ```
-Later on, `*state` was mutated on the Rust side of the FFI boundary through a different mutable reference. This invalidated all pointers derived from other references to this location—including the one that was copied by the C library. This made it undefined behavior to access this invalid pointer on the C side of the FFI boundary.
+Later on, `*state` was mutated on the Rust side of the FFI boundary through a different mutable reference. This invalidated all pointers derived from other references to this location—including the one that was copied by the C library. This made it undefined behavior to access this invalid pointer on the C side of the FFI boundary. This particular bug has been fixed, but the underlying problem still remains; without more flexible tooling, these kinds of aliasing bugs are likely to remain undetected.
 
-Miri detects aliasing errors by tracking the *provenance* of each pointer, which indicates "where and when" it is allowed to access memory (see RFC [#3559](https://rust-lang.github.io/rfcs/3559-rust-has-provenance.html)). Rust does not have a canonical provenance model yet. However, both the [Stacked Borrows](https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf) and [Tree Borrows](https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf) models have been proposed. Miri implements these models by associating each memory allocation with a unique "allocation ID" and a set of permissions. The structure and semantics of permissions vary depending on which model is enabled, but each permission is labelled by a "borrow tag". Likewise, each pointer's [Provenance](https://github.com/rust-lang/miri/blob/7d5ae365eb1db28d15e540d43a50530a49512db4/src/machine.rs#L267) metadata includes both a borrow tag and an allocation ID, indicating its permission to access locations within that allocation. Before a memory access, Miri validates the pointer's provenance metadata to determine if that access is undefined behavior.
+Miri detects aliasing errors by tracking the *provenance* of each pointer, which indicates "where and when" it is allowed to access memory (see RFC [#3559](https://rust-lang.github.io/rfcs/3559-rust-has-provenance.html)). Rust does not have a canonical provenance model yet. However, both the [Stacked Borrows](https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf) and [Tree Borrows](https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf) models have been proposed. Miri implements these models by associating each memory allocation with a unique "allocation ID" and a set of permissions. The structure and semantics of permissions vary depending on which model is enabled, but each permission is labelled by a "borrow tag". Likewise, each pointer's [Provenance](https://github.com/rust-lang/miri/blob/7d5ae365eb1db28d15e540d43a50530a49512db4/src/machine.rs#L267) metadata includes both a borrow tag and an allocation ID, which determine the pointer's permission to access locations within that allocation. Before each memory access, Miri validates the pointer's provenance metadata to determine if that access is undefined behavior.
 
-A [`Retag`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/enum.StatementKind.html#variant.Retag) statement updates a pointer's borrow tag, assigning it new permissions within the stack or tree. The semantics of a retag vary under each aliasing model. but the core mechanism used by Miri remains the same; a new tag replaces the old one. However, only certain retags are present as explicit MIR statements. The rest are implicitly executed by Miri in the process of interpreting assignment statements. All explicit retags are discarded before MIR is lowered into Rust's codegen backends. This makes it impossible to develop tools that can track and update provenance metadata within lower-level representations of Rust programs.
+A [`Retag`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/enum.StatementKind.html#variant.Retag) statement updates a pointer's borrow tag, assigning it new permissions within the stack or tree. The semantics of a retag vary under each aliasing model, but Miri's core mechanism remains the same; a new tag replaces the old one. However, only certain retags are present as explicit MIR statements. The rest are implicitly executed by Miri in the process of interpreting assignment statements. All explicit retags are discarded before MIR is lowered into Rust's codegen backends. This makes it impossible to develop tools that can track and update provenance metadata within lower-level representations of Rust programs.
 
-To overcome Miri's lack of support for foreign function calls, developers will need tools that can track provenance in lower-level representations of Rust programs. We propose a implementing standardized interface that third-party tools can use control the location and semantics of retag statements through compiler plugins, as well as a mechanism for lowering retags deeper into Rust's codegen backends.
+To overcome Miri's lack of support for foreign function calls, developers will need tools that can track provenance in lower-level representations of Rust programs. We propose implementing standardized interface that third-party tools can use to control the location and semantics of retag statements through compiler plugins, as well as a mechanism for lowering retags deeper into Rust's codegen backends.
 
 # Guide-level explanation
-The precise semantics of Stacked and Tree Borrows are out of scope for this RFC. Instead, we want to describe retagging with just enough detail so that developers who are unfamiliar with Stacked and Tree Borrows can reason about the implications of our proposal; and developers who *are* familiar with these models are confident that our lower-level retags are correct and precise enough to implement Miri's methods for detecting aliasing errors for lower level representations.
+The precise semantics of Stacked and Tree Borrows are out of scope for this RFC. Instead, we want to describe retagging with just enough detail so that developers who are unfamiliar with these models can reason about the implications of our proposed changes to the compiler; and so that developers who *are* familiar with these models are confident that our lower-level retags are correct and precise enough to support detecting any aliasing violation.
 
 ## Explicit Retags
-Consider the following Rust program, which has undefined behavior under Stacked and Tree Borrows.
+Consider the following Rust program, which has undefined behavior under both Stacked and Tree Borrows. We'll use this as an example to illustrate where retagging happens. In each case, the target of a retag is either a pointer, a reference, or a `Box`, depending on which aliasing model is being used.
 ```rust
 fn example(x: Option<Box<i32>>) {
     if let Some(mut x) = x {
@@ -42,42 +42,42 @@ fn example(x: Option<Box<i32>>) {
     }
 }
 ```
-The most intuitive form of a retag happens implicitly, when Miri interprets certain assignment statements. One of these "implicit retags" occurs in our example:
+Certain retags occur implicitly when Miri interprets certain assignment statements. One of these "implicit retags" occurs in our example:
 ```rust
 let rx = &mut unsafe { *ptr_x };
 ```
 When Miri interprets this statement, it will retag the pointer produced by evaluating the expression `&mut unsafe { *ptr_x }` on-the-fly; after it has been evaluated, but before it is assigned to the place `rx`.
 
-However, other retags are emitted as explicit [`Retag`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/enum.StatementKind.html) MIR statements. Miri enables this feature using the unstable flag `-Zmir-emit-retag`.
+Retags can also occur as explicit [`Retag`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/enum.StatementKind.html) MIR statements:
 ```rust
 pub enum StatementKind<'tcx> {
     ...
     Retag(RetagKind, Box<Place<'tcx>>)
 }
 ```
-We refer to these statements as "explicit retags". Overall, explicit forms of reborrowing (e.g. `&mut *p`) are handled using implicit retags, while the many [implicit reborrows](https://github.com/rust-lang/reference/issues/788) inserted by the compiler tend to correspond to explicit retags in the MIR.
+We refer to these statements as "explicit retags". Explicit retags apply to an entire place, and they do not specifically identify which references, pointers, or `Box`es inside of the place are receiving the retag; Miri has access to type information and can determine this at run-time.
 
-There are multiple situations where explicit retags are emitted, and each situation corresponds to a different variant of [`RetagKind`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/enum.RetagKind.html). When entering a function, arguments that contain references receive an explicit, function-entry retag (`RetagKind::FnEntry`). This occurs for the argument `x` in our example. When we compile this program with `-Zmir-emit-retag`, we see the following MIR:
+There are multiple situations where explicit retags are emitted. When entering a function, arguments that contain references receive an explicit, function-entry retag (`RetagKind::FnEntry`). This occurs for the argument `x` in our example. When we compile this program with `-Zmir-emit-retag`, we see the following MIR:
 ```rust
 fn example(_1: Option<Box<i32>>) -> () {
     ...
     bb0: {
         Retag([fn entry] _1);
 ```
-The type `Option<&mut T>` contains a reference, so the argument `x` needs a function-entry retag. In both Stacked and Tree Borrows, permissions created by function-entry retags create a new permission that has a "protector".
+The type `Option<&mut T>` contains a reference, so the argument `x` needs a function-entry retag.
 
-Next, if a place is assigned a value that contains a reference, then the place will receive an explicit retag immediately after the assignment. Note that this does not include cases where the value being assigned is a new reference (e.g. `x = &mut y;`), which Miri handles implicitly. We need this kind of retag to handle true branch of the conditional in our example:
+Next, if a place is assigned a value that contains a reference or a `Box`, then the place will receive an explicit retag immediately after the assignment. Note that this does not include cases where the value being assigned is a new reference (e.g. `x = &mut y;`), which Miri handles implicitly. We need this kind of retag to handle the true branch of the conditional in our example:
 ```rust
 if let Some(mut x) = x { ... }
 ```
 This has the following MIR:
 ```rust
-_2 = move ((_1 as Some).0: &mut i32);
+_2 = move ((_1 as Some).0: Box<i32>);
 Retag(_2);
 ```
-We are moving an `Option<Box<&mut i32>>`, which contains a reference, so we need to retag the target of the assignment.
+We are moving an `Option<Box<i32>>`, which contains a `Box`, so we need to retag the target of the assignment.
 
-We also emit explicit retags when creating a raw pointer to the inside of a `Box`. This is specific to Stacked Borrows, where raw pointers receive a retag after being cast from references. A `Box` has a uniqueness guarantee, much like a mutable reference. However, at the MIR level, dereferencing a `Box` is ["desugared"](https://doc.rust-lang.org/nightly/nightly-rustc/src/rustc_mir_transform/add_retag.rs.html#133) to working directly with a raw pointer, which has no implicit uniqueness guarantee. Adding an explicit retag is necessary for this edge case.This happens in our example when we assign to `ptr_x`:
+We also emit explicit retags when creating a raw pointer to the inside of a `Box`. This is specific to Stacked Borrows, where raw pointers receive a retag after being cast from references. A `Box` has a uniqueness guarantee, much like a mutable reference. However, at the MIR level, dereferencing a `Box` is ["desugared"](https://doc.rust-lang.org/nightly/nightly-rustc/src/rustc_mir_transform/add_retag.rs.html#133) to working directly with a raw pointer, which has no implicit uniqueness guarantee. Adding an explicit retag is necessary for this edge case. This happens in our example when we assign to `ptr_x`:
 ```rust
 let ptr_x: *mut i32 = &raw mut *x;
 ```
@@ -108,7 +108,7 @@ We would need an additional configuration flag to enable explicit retags in thes
 ## Codegen
 Once all retags are explicit, we need a way to lower them into a representation that can be consumed by codegen backends. The easiest way to do this with the least impact on existing APIs within the compiler is to emit retags as function calls. The underlying functions will not actually exist; the only purpose of these calls is to carry type and aliasing information, and we expect that they will be transformed or intercepted by third-party tools.
 
-A [`Place`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/struct.Place.html) is a series of zero or more projections from a local variable. If a place has projections, then the pointer that we are retagging is not available yet; we need to load it from memory. Otherwise, we can access the pointer directly as an operand without having to do any extra work. Miri handles each of these cases using [`retag_place_contents`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_place_contents) and [`retag_ptr_value`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_ptr_value), respectively. This means that we need to emit retags in two different forms, depending on whether the pointer being retagged has been loaded from memory, or if it's in stored within a place. Each form will use a different function (shown in LLVM IR):
+A [`Place`](https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/mir/struct.Place.html) is a series of zero or more projections—field offsets, casts, dereferences—from a local variable. If a place has projections, then the pointer that we are retagging is not available yet; we need to load it from memory. Otherwise, we can access the pointer directly as an operand without having to do any extra work. Miri handles each of these cases using [`retag_place_contents`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_place_contents) and [`retag_ptr_value`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/trait.Machine.html#method.retag_ptr_value), respectively. This means that we need to emit retags in two different forms, depending on whether the pointer being retagged has been loaded from memory, or if it's stored within a place. Each form will use a different function (shown in LLVM IR):
 ```llvm
 ptr @__retag_operand(ptr)
 void @__retag_place(ptr)
@@ -159,15 +159,14 @@ In this snippet, the function `example` receives a pointer (`%0`) to the place c
 Here, we describe each of the changes to the compiler that we will need to fully implement this feature.
 
 ## MIR-Level Changes
-Outside of `rustc_codegen_ssa`, most of the semantic changes to the compiler will happen inside the [`AddRetag`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/add_retag/struct.AddRetag.html) MIR pass. This is enabled by the unstable flag `-Zmir-emit-retag`, which will now take three options:
-
+Outside of `rustc_codegen_ssa`, most of the semantic changes to the compiler will happen inside the [`AddRetag`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/add_retag/struct.AddRetag.html) MIR pass, which is enabled by the unstable flag `-Zmir-emit-retag`. This flag will now take three options:
 * `partial` (default) - Nothing changes from the current behavior.
-* `full` - Explicit retags will be emitted when references are created.
-* `full-raw` - Explicit retags will be emitted when references are created and when they are cast into raw pointers.
+* `full-tb` - Explicit retags will be emitted when references are created, but not for raw pointers.
+* `full-sb` - Explicit retags will be emitted when references are created and when they are cast into raw pointers.
 
-In both the `full` and `full-raw` modes, we apply the transformation shown earlier, where temporary variables are introduced emit explicit retags for borrowing. All other significant changes to the compiler involve code generation.
+In both the `full-tb` and `full-sb` modes, we apply the transformation shown earlier, where temporary variables are introduced to emit explicit retags for borrowing. All other significant changes to the compiler involve code generation.
 
-## Codegen
+## Changes to Codegen
 Here, we propose a signature for our low-level retag intrinsics and outline how a single MIR-level [`Retag`](https://doc.rust-lang.org/core/intrinsics/mir/fn.Retag.html) statement will be lowered into one or more intrinsic calls.
 
 ### Retag Intrinsics
@@ -186,7 +185,7 @@ An offset in bytes from the start of the pointer being retagged, indicating the 
 
 #### 3. Permission Type (`i64`)
 
-The kind of permission created by the retag operation. This should be equivalent to Miri's [`NewPermission`](https://github.com/rust-lang/miri/blob/7d5ae365eb1db28d15e540d43a50530a49512db4/src/borrow_tracker/tree_borrows/mod.rs#L118) or MiniRust's [ReborrowSettings](https://github.com/minirust/minirust/blob/master/spec/mem/tree_borrows/reborrow_settings.md), but serialized into a `u64`. This value will be computed using the following MIR query:
+The kind of permission created by the retag operation. This should be equivalent to Miri's [`NewPermission`](https://github.com/rust-lang/miri/blob/7d5ae365eb1db28d15e540d43a50530a49512db4/src/borrow_tracker/tree_borrows/mod.rs#L118) or MiniRust's [`ReborrowSettings`](https://github.com/minirust/minirust/blob/master/spec/mem/tree_borrows/reborrow_settings.md), but serialized into a `u64`. This value will be computed using the following MIR query:
 ```rust
 query retag_perm(
     key: (
@@ -206,7 +205,7 @@ A flag indicating whether this is a function-entry retag. Permissions created by
 #### 5. Interior Mutable Fields (`ptr`)
 A pointer to a global constant array of pairs of `i64` values. Each pair consists of the offset and size of an interior mutable field within the pointee type.
 
-Each borrow tag may provide different access capabilities depending on the range within the layout of the type that is being accessed. This is relevant for types that contain `UnsafeCell`, which provides interior mutability. For example, if we have a reference `x: &(u32, UnsafeCell<u32>)` then writing through `x.0` is undefined behavior, but we want to allow writing through `x.1`.To handle this, each retag needs to have access to the offsets and sizes of the fields of the pointee type that are covered by `UnsafeCell`. We will store this information as a constant array of pair of integers. We do not need to emit any additional branching to handle interior mutable enums, since if one variant contains an `UnsafeCell`, then the entire enum is considered interior mutable (see [`UnsafeCellVisitor`](https://github.com/rust-lang/miri/blob/751fca02946d501c3ffcdd8e63793546a8d85b31/src/helpers.rs#L602)). We also will provide a new unstable flag `-Zcodegen-retag-no-precise-interior-mut` to enable this behavior by default for all aggregate types, matching Miri's `-Zmiri-tree-borrows-no-precise-interior-mut` flag.
+Each borrow tag may provide different access capabilities depending on the range within the layout of the type that is being accessed. This is relevant for types that contain `UnsafeCell`, which provides interior mutability. For example, if we have a reference `x: &(u32, UnsafeCell<u32>)` then writing through `x.0` is undefined behavior, but we want to allow writing through `x.1`. To handle this, each retag needs to have access to the offsets and sizes of the fields of the pointee type that are covered by `UnsafeCell`. We will store this information as a constant array of pairs of integers. We do not need to emit any additional branching to handle interior mutable enums, since if one variant contains an `UnsafeCell`, then the entire enum is considered interior mutable (see [`UnsafeCellVisitor`](https://github.com/rust-lang/miri/blob/751fca02946d501c3ffcdd8e63793546a8d85b31/src/helpers.rs#L602)). We also will provide a new unstable flag `-Zcodegen-retag-no-precise-interior-mut` to enable this behavior by default for all aggregate types, matching Miri's `-Zmiri-tree-borrows-no-precise-interior-mut` flag.
 
 ### Expanding Retags
 
@@ -233,11 +232,11 @@ struct RetagLayout {
     variants: IndexMap<VariantIdx, RetagPlan>,
 }
 ```
-By default, a retag plan will cover the full layout of a type. However, developers will also be able to adjust the precision of this step using a new unstable flag `-Zcodgen-retag-fields`, which will take three options:
+By default, a retag plan will cover the full layout of a type. However, developers will also be able to adjust the precision of this step using a new unstable flag `-Zcodegen-retag-fields`, which will take three options:
 * `all` (default) - Always recurse.
 * `none` - Never recurse. Unsound.
 * `scalar` - Only recurse into scalar values.
-This matches Miri's [`-Zmiri-retag-fields`](https://github.com/rust-lang/miri/blob/7d5ae365eb1db28d15e540d43a50530a49512db4/README.md?plain=1#L467) flag.
+This matches Miri's [`-Zmiri-retag-fields`](https://github.com/rust-lang/miri/blob/7d5ae365eb1db28d15e540d43a50530a49512db4/README.md?plain=1#L467) flag exactly.
 
 After creating a plan, we will use it to determine how we project through the `PlaceRef` or `OperandRef` being retagged to emit each intrinsic call. When we reach `RetagPlan::Recurse`, we will branch to each variant, creating a new basic block for retagging its contents. Each "variant block" will eventually branch to a single "terminator block". For example, if we were retagging a value of type `Either<A, B>`, where `A` and `B` both contain references, we will generate two variant blocks: one for the `Left` variant and another for the `Right` variant. We will `br` to either block, and then each block will branch to the same terminator block.
 
@@ -259,4 +258,4 @@ We know that the second component of the pair will need to be replaced with eith
 %terminator:
   %alias = phi ptr [%alias1, %left], [%alias2, %right]
 ```
-The value `%alias` will be equal to `%alias1` if we came from the `%left` block and `alias2` if we came from the `%right` block.
+The value `%alias` will be equal to `%alias1` if we came from the `%left` block and `%alias2` if we came from the `%right` block.
