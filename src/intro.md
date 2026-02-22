@@ -1,6 +1,6 @@
 # Introduction
 
-> Check out our first [status update](/status/january_2026.md) for 2026! 👀 
+> Check out our latest [status update](/status/february_2026.md) for February 2026! 👀 
 
 **BorrowSanitizer** is a dynamic analysis tool for detecting Rust-specific aliasing bugs in multi-language applications.
 
