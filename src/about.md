@@ -19,6 +19,7 @@ Please reach out to us if you are interested in contributing to this project. Cu
 * [Joshua Sunshine](https://www.cs.cmu.edu/~jssunshi/)
 * [Rafayel Amirkhanyan](https://www.linkedin.com/in/rafayel-amirkhanyan-a87134241/)
 * [Molly MacLaren](https://macla.ren/)
+* [Krit Dass](https://kritdass.github.io/)
 
 ## License & Credits
 BorrowSanitizer is dual-licensed under [Apache](https://github.com/BorrowSanitizer/rust/blob/bsan/LICENSE-APACHE) and [MIT](https://github.com/BorrowSanitizer/rust/blob/bsan/LICENSE-MIT).
