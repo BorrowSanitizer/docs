@@ -43,3 +43,16 @@ xb ui
 ```
 
 This will place our binaries into Cargo's [home directory](https://doc.rust-lang.org/cargo/guide/cargo-home.html) (`$HOME/.cargo`). You will need to have `bsan` set as the active toolchain (e.g. `rustup default bsan`) for our tool to work. 
+
+You can also instrument individual Rust programs using the `inst` subcommand. For example:
+```
+xb inst path/to/program.rs
+```
+This produces a binary which will execute Borrow Sanitizer on the target, like so:
+```
+./program
+```
+It is recommended that you set the symbolizer flag to see source locations of aliasing violations (if they are found) using:
+```
+export BSAN_SYMBOLIZER="/root/.rustup/toolchains/bsan/bin/llvm-symbolizer"
+```
