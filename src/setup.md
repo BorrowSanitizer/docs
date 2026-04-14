@@ -48,7 +48,7 @@ You can also instrument individual Rust programs using the `inst` subcommand. Fo
 ```
 xb inst path/to/program.rs
 ```
-This produces a binary which will execute Borrow Sanitizer on the target, like so:
+This produces a binary which will execute BorrowSanitizer on the target, like so:
 ```
 ./program
 ```
