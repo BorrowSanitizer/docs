@@ -1,6 +1,6 @@
 # Status Update - April 2026
 
-### By: Ian McCormack, Molly MacLaren, and Joshua Sunshine
+### By: Ian McCormack, Molly MacLaren, Jonathan Aldrich, and Joshua Sunshine
 
 We are building BorrowSanitizer: an LLVM-based instrumentation tool for finding violations of Rust’s aliasing model in multilanguage applications. If you are new to the project, we recommend checking out the [introduction](https://borrowsanitizer.com/intro.html) and our [first status update](https://borrowsanitizer.com/status/january_2026.html) before continuing.
 
@@ -8,9 +8,9 @@ This month, we focused on answering some of the remaining open design questions 
 * Implemented a new *shadow stack* for storing pointer metadata. 
 * Finished implementing our retag intrinsics.
  
-We'll be sending in a few PRs for our retags to the Rust compiler in the next week or so. It will take a bit of time split our changes into more easily reviewable chunks.
+We'll be sending in a few PRs for our retags to the Rust compiler in the next week or so. It will take a bit of time to split our changes into more easily reviewable chunks.
 
-The RFC for our LLVM components is taking a little longer than expected, but it was worth taking the extra time to test out compiler changes and make sure that we had the core parts of the instrumentation pass settled. We'll be drafting the RFC throughout the next few weeks.
+The RFC for our LLVM components is taking a little longer than we expected, but it was worth taking the extra time to test out compiler changes and make sure that we had the core parts of the instrumentation pass settled. We'll be drafting the RFC throughout the next few weeks.
 
 ## Shadow Arrays
 Most sanitizers need a way to pass metadata alongside the arguments to each function. A naive approach would be to modify the function's signature to accept additional arguments, but this would break compatibility with uninstrumented code. Sanitizers solve this problem by storing metadata within dedicated "shadow" memory spaces that correspond to the locations where arguments and return values are typically stored. 
