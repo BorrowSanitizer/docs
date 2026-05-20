@@ -37,6 +37,18 @@ jobs:
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
+      - name: Update latest redirect
+        run: |
+          LATEST=$(ls src/status/ | python3 -c "
+          import sys, datetime
+          entries = sys.stdin.read().split()
+          def to_date(s):
+              name = s.removesuffix('.md')
+              month, year = name.split('_')
+              return datetime.datetime.strptime(f'{month} {year}', '%B %Y')
+          print(sorted(entries, key=to_date)[-1].removesuffix('.md'))
+          ")
+          sed -i '' 's|"/latest.html" = ".*"|"/latest.html" = "/status/'"$LATEST"'.html"|' book.toml
       - name: Build with mdBook
         run: mdbook build
       - name: Upload artifact
