@@ -50,7 +50,7 @@ jobs:
               return datetime.datetime.strptime(f'{month} {year}', '%B %Y')
           print(sorted(entries, key=to_date)[-1].removesuffix('.md'))
           ")
-          sed -i '' 's|"/latest.html" = ".*"|"/latest.html" = "/status/'"$LATEST"'.html"|' book.toml
+          sed -i '' 's|"/status/latest.html" = ".*"|"/status/latest.html" = "/status/'"$LATEST"'.html"|' book.toml
           echo "LATEST=$LATEST"
           grep 'latest' book.toml
       - name: Build with mdBook
