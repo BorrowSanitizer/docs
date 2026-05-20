@@ -24,7 +24,7 @@ jobs:
           cargo install mdbook-image-size mdbook-external-links
       - name: Update latest redirect
         run: |
-          LATEST=$(ls src/status/ | python3 -c "
+          LATEST=$(ls -p src/status/ | grep -v '/' | grep -E '^[a-z]+_[0-9]{4}\.md$' | python3 -c "
           import sys, datetime
           entries = sys.stdin.read().split()
           def to_date(s):
