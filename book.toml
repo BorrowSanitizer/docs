@@ -15,4 +15,4 @@ after = [ "image-size" ]
 command = "mdbook-image-size"
 
 [output.html.redirect]
-"/status/latest.html" = "/status/march_2026.html"
+"/status/latest.html" = ""

@@ -51,6 +51,8 @@ jobs:
           print(sorted(entries, key=to_date)[-1].removesuffix('.md'))
           ")
           sed -i '' 's|"/latest.html" = ".*"|"/latest.html" = "/status/'"$LATEST"'.html"|' book.toml
+          echo "LATEST=$LATEST"
+          grep 'latest' book.toml
       - name: Build with mdBook
         run: mdbook build
       - name: Upload artifact
