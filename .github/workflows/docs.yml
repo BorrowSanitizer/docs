@@ -4,15 +4,13 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
+  # Runs on PRs only
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -35,11 +33,12 @@ jobs:
           cargo install --version ${MDBOOK_VERSION} mdbook
           cargo install mdbook-image-size mdbook-external-links
       - name: Setup Pages
+        if: github.event_name == 'push'
         id: pages
         uses: actions/configure-pages@v5
       - name: Update latest redirect
         run: |
-          LATEST=$(ls src/status/ | python3 -c "
+          LATEST=$(ls -p src/status/ | grep -v '/' | grep -E '^[a-z]+_[0-9]{4}\.md$' | python3 -c "
           import sys, datetime
           entries = sys.stdin.read().split()
           def to_date(s):
@@ -52,12 +51,18 @@ jobs:
       - name: Build with mdBook
         run: mdbook build
       - name: Upload artifact
+        if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./book
 
   # Deployment job
   deploy:
+    if: github.event_name == 'push'
+    # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
