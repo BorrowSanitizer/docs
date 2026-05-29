@@ -8,6 +8,7 @@
 * [February 2026](status/february_2026.md)
 * [March 2026](status/march_2026.md)
 * [April 2026](status/april_2026.md)
+* [May 2026](status/may_2026.md)
 
 --------------
 [About](about.md)
