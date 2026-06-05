@@ -40,8 +40,7 @@ jobs:
           cargo install mdbook-rss-feed
       - name: Restore mtimes from git history
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install git-restore-mtime
+          python3 -m pip install --break-system-packages git-restore-mtime
           git-restore-mtime
       - name: Setup Pages
         if: github.event_name == 'push'
