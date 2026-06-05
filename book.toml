@@ -10,6 +10,7 @@ renderers = ["html"]
 
 [output.html]
 git-repository-url = "https://github.com/BorrowSanitizer"
+site-url = "https://borrowsanitizer.com/"
 
 [preprocessor.external-links]
 after = [ "image-size" ]
