@@ -29,6 +29,8 @@ jobs:
       MDBOOK_VERSION: 0.4.36
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install mdBook
         run: |
           curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf -y | sh
@@ -36,6 +38,11 @@ jobs:
           cargo install --version ${MDBOOK_VERSION} mdbook
           cargo install mdbook-image-size mdbook-external-links
           cargo install mdbook-rss-feed
+      - name: Restore mtimes from git history
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install git-restore-mtime
+          git-restore-mtime
       - name: Setup Pages
         if: github.event_name == 'push'
         id: pages
