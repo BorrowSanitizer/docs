@@ -39,9 +39,7 @@ jobs:
           cargo install mdbook-image-size mdbook-external-links
           cargo install mdbook-rss-feed
       - name: Restore mtimes from git history
-        run: |
-          python3 -m pip install --break-system-packages git-restore-mtime
-          git-restore-mtime
+        uses: chetan/git-restore-mtime-action@v2
       - name: Setup Pages
         if: github.event_name == 'push'
         id: pages
