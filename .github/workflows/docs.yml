@@ -39,7 +39,25 @@ jobs:
           cargo install mdbook-image-size mdbook-external-links
           cargo install mdbook-rss-feed
       - name: Restore mtimes from git history
-        uses: chetan/git-restore-mtime-action@v2
+        run: |
+          python3 - <<'EOF'
+          import subprocess, os
+          out = subprocess.check_output(
+            ['git', 'log', '--pretty=format:%at', '--name-only', '--diff-filter=ACM', '--no-renames']
+          ).decode()
+          seen = {}
+          ts = None
+          for line in out.splitlines():
+              if not line:
+                  continue
+              if line.isdigit():
+                  ts = int(line)
+              elif ts is not None and line not in seen:
+                  seen[line] = ts
+          for path, mtime in seen.items():
+              if os.path.exists(path):
+                  os.utime(path, (mtime, mtime))
+          EOF
       - name: Setup Pages
         if: github.event_name == 'push'
         id: pages
