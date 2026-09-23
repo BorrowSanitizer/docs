@@ -42,35 +42,18 @@ jobs:
         run: |
           python3 - <<'EOF'
           import subprocess, os
-          # Walk history newest-first. Pure renames (R100) don't count as a
-          # modification; instead, older history of the old path is attributed
-          # to the file's current path, so moving files between folders
-          # doesn't reset their mtimes.
           out = subprocess.check_output(
-            ['git', 'log', '--pretty=format:@%at', '--name-status', '-M']
+            ['git', 'log', '--pretty=format:%at', '--name-only', '--diff-filter=ACM', '--no-renames']
           ).decode()
           seen = {}
-          alias = {}
           ts = None
           for line in out.splitlines():
               if not line:
                   continue
-              if line.startswith('@'):
-                  ts = int(line[1:])
-                  continue
-              if ts is None:
-                  continue
-              status, *paths = line.split('\t')
-              if status[0] in 'RC':
-                  old, new = paths
-                  cur = alias.get(new, new)
-                  if status != 'R100':
-                      seen.setdefault(cur, ts)
-                  if status[0] == 'R':
-                      alias[old] = cur
-              elif status[0] in 'AM':
-                  path = paths[0]
-                  seen.setdefault(alias.get(path, path), ts)
+              if line.isdigit():
+                  ts = int(line)
+              elif ts is not None and line not in seen:
+                  seen[line] = ts
           for path, mtime in seen.items():
               if os.path.exists(path):
                   os.utime(path, (mtime, mtime))
@@ -80,7 +63,6 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
       - name: Update latest redirect
-        working-directory: mdbook
         run: |
           LATEST=$(ls -p src/status/ | grep -v '/' | grep -E '^[a-z]+_[0-9]{4}\.md$' | python3 -c "
           import sys, datetime
@@ -100,9 +82,9 @@ jobs:
       - name: Assemble site
         run: |
           rm -rf site
-          mv mdbook/book site
+          cp -R mdbook/book site
           mkdir -p site/benchmarks
-          cp -R benchmarks/* site/benchmarks/
+          cp benchmarks/* site/benchmarks/
       - name: Upload artifact
         if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
