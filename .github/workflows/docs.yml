@@ -102,7 +102,7 @@ jobs:
           rm -rf site
           mv mdbook/book site
           mkdir -p site/benchmarks
-          cp benchmarks/*
+          cp -R benchmarks/* site/benchmarks/
       - name: Upload artifact
         if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
