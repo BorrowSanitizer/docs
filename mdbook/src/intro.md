@@ -4,7 +4,7 @@
 
 **BorrowSanitizer** is a dynamic analysis tool for detecting Rust-specific aliasing bugs in multi-language applications.
 
-![the BorrowSanitizer project logo](images/bsan.svg "project logo" =x75 center )
+<p style="text-align:center"><img src="images/bsan.svg" alt="the BorrowSanitizer project logo" title="project logo" height="175"></p>
 
 The Rust compiler provides powerful, *static* safety guarantees by restricting aliasing and mutability. However, developers can bypass these restrictions by using a subset of [`unsafe`](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html) features. These features are necessary for Rust to interoperate with other languages. However, if developers use unsafe code incorrectly, then they can break the rules of Rust's aliasing model, which the compiler relies on to be able to optimize programs. Incorrect optimizations can introduce security vulnerabilities.
 

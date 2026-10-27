@@ -1,7 +1,6 @@
 [book]
 authors = ["Ian McCormack"]
 language = "en"
-multilingual = false
 src = "src"
 title = "BorrowSanitizer"
 
@@ -12,11 +11,5 @@ renderers = ["html"]
 git-repository-url = "https://github.com/BorrowSanitizer"
 site-url = "https://borrowsanitizer.com/"
 
-[preprocessor.external-links]
-after = [ "image-size" ]
-
-[preprocessor.image-size]
-command = "mdbook-image-size"
-
 [output.html.redirect]
-"/status/latest.html" = "/status/august_2026.md"
+"/status/latest.html" = "/status/september_2026.html"

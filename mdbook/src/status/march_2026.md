@@ -16,7 +16,7 @@ To find appropriate test cases, we started with the 860 tests in Miri's [`pass`]
 
 We executed each of these tests in Miri under a configuration that is similar to BorrowSanitizer. That is, we enabled Tree Borrows and disabled other forms of checking. There were 405 test cases that exited with "0" or terminated with a kind of undefined behavior that BorrowSanitizer should be able to detect. At the moment, 80% of these tests have the correct behvavior in BorrowSanitizer:
 
-![80% of relevant test cases have the correct behavior in BorrowSanitizer](images/march_2026.png =300x center)
+<p style="text-align:center"><img src="images/march_2026.png" alt="80% of relevant test cases have the correct behavior in BorrowSanitizer" width="300"></p>
 
 The remaining 20% of tests are failing for a variety of reasons, but at least 27 of them involve Miri's "wildcard" provenance semantics. When a pointer is created from an integer, Miri assigns it a "wildcard" provenance value. In the "permissive provenance" mode, Miri validates accesses through wildcard pointers using a global mapping between addresses and memory allocations. BorrowSanitizer does not have a similar mapping; at the moment, we ignore the effects of accesses with wildcard pointers. We plan to match Miri's capabilities here eventually. 
 
