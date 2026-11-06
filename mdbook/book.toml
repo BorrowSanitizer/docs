@@ -12,4 +12,4 @@ git-repository-url = "https://github.com/BorrowSanitizer"
 site-url = "https://borrowsanitizer.com/"
 
 [output.html.redirect]
-"/status/latest.html" = "/status/september_2026.html"
+"/status/latest.html" = "/status/october_2026.html"
